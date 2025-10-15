@@ -1,2 +1,2 @@
 # syncstream
-google extension
+browser extension
