@@ -1,189 +1,97 @@
-class SyncStream {
-    constructor() {
-        this.peers = new Map();
-        this.isHost = false;
-        this.roomId = null;
-        this.currentVideo = null;
-        this.init();
+class syncsender{
+    constructor(){
+        this.lc = new RTCPeerConnection();
+        this.dc = new this.lc.createDataChannel();
     }
-    
-    init() {
-        this.setupEventListeners();
-        this.detectVideo();
-        this.startVideoDetection();
+
+    update(){
+        // cureent video time dalna and +- 3 sec ka change ho sakta 
+        // aagar more than that then update video player wala 
+        const video = document.querySelector('video');
+        const updates = {
+            currentTime: video.currentTime,
+            paused: video.paused
+        };
+        return updates;
     }
-    
-    setupEventListeners() {
+
+    send(updates){
+        this.dc.send(JSON.stringify(updates));
+    }
+}
+
+class syncreceiver{
+    constructor(){
+        this.lc = new RTCPeerConnection();
         
-        document.getElementById('createRoomBtn').addEventListener('click', () => this.createRoom());
-        document.getElementById('joinRoomBtn').addEventListener('click', () => this.joinRoom());
-        
-        document.getElementById('syncBtn').addEventListener('click', () => this.syncVideo());
-        document.getElementById('leaveBtn').addEventListener('click', () => this.leaveRoom());
+        // receive wala cause just check dc for update
+        this.dc.onmessage = (event) => {
+            const updates = JSON.parse(event.data);
+            this.receive(updates);
+        };
     }
-    
-    generateRoomId() {
-        return Math.random().toString(36).substr(2, 8).toUpperCase();
-    }
-    
-    createRoom() {
-        this.roomId = this.generateRoomId();
-        this.isHost = true;
-        this.showRoomSection();
-        this.updateStatus('Room created - waiting for peers');
-        this.simulatePeerConnection();
-    }
-    
-    joinRoom() {
-        const roomId = document.getElementById('roomIdInput').value.trim();
-        if (!roomId) {
-            alert('Please enter a room ID');
-            return;
-        }
-        
-        this.roomId = roomId;
-        this.isHost = false;
-        this.showRoomSection();
-        this.updateStatus('Connecting to room...');
-        this.connectToRoom();
-    }
-    
-    showRoomSection() {
-        document.getElementById('setupSection').style.display = 'none';
-        document.getElementById('roomSection').style.display = 'block';
-        document.getElementById('roomId').textContent = this.roomId;
-    }
-    
-    showSetupSection() {
-        document.getElementById('setupSection').style.display = 'block';
-        document.getElementById('roomSection').style.display = 'none';
-        document.getElementById('roomIdInput').value = '';
-    }
-    
-    updateStatus(status) {
-        document.getElementById('statusText').textContent = ' • ' + status;
-    }
-    
-    connectToRoom() {
-        
-        setTimeout(() => {
-            this.updateStatus('Connected to room');
-            this.simulatePeerConnection();
-        }, 1000);
-    }
-    
-    simulatePeerConnection() {
-        
-        setTimeout(() => {
-            this.addPeer('User_' + Math.random().toString(36).substr(2, 4));
-            this.updatePeerCount();
-        }, 2000);
-        
-        setTimeout(() => {
-            this.addPeer('User_' + Math.random().toString(36).substr(2, 4));
-            this.updatePeerCount();
-        }, 4000);
-    }
-    
-    addPeer(peerId) {
-        this.peers.set(peerId, { id: peerId, connected: true });
-        this.renderPeers();
-    }
-    
-    removePeer(peerId) {
-        this.peers.delete(peerId);
-        this.renderPeers();
-    }
-    
-    renderPeers() {
-        const peersList = document.getElementById('peersList');
-        peersList.innerHTML = '';
-        
-        this.peers.forEach(peer => {
-            const peerEl = document.createElement('div');
-            peerEl.className = 'userContainer';
-            peerEl.innerHTML = `<p> • ${peer.id}</p>`;
-            peersList.appendChild(peerEl);
-        });
-    }
-    
-    updatePeerCount() {
-        document.getElementById('peerCount').textContent = this.peers.size;
-    }
-    
-    detectVideo() {
-        
-        const commonVideoSites = [
-            { title: 'YouTube Video', url: 'https://youtube.com/watch?v=example' },
-            { title: 'Netflix Movie', url: 'https://netflix.com/watch/example' },
-            { title: 'Vimeo Video', url: 'https://vimeo.com/example' }
-        ];
-        
-        const randomVideo = commonVideoSites[Math.floor(Math.random() * commonVideoSites.length)];
-        this.currentVideo = randomVideo;
-        this.updateVideoInfo();
-    }
-    
-    startVideoDetection() {
-       
-        setInterval(() => {
-            if (Math.random() > 0.7) {
-                this.detectVideo();
+
+    receive(updates){
+        const video = document.querySelector('video');
+        if (Math.abs(updates.currentTime - video.currentTime) > 5) {
+            video.currentTime = updates.currentTime;
+
+            if (updates.paused) {
+                video.pause();
             }
-        }, 10000);
-    }
-    
-    updateVideoInfo() {
-        const videoInfo = document.getElementById('videoInfo');
-        if (this.currentVideo) {
-            videoInfo.innerHTML = `
-                <p class="videoName">${this.currentVideo.title}</p>
-                <p class="videoLink">${this.currentVideo.url}</p>
-            `;
-        } else {
-            videoInfo.innerHTML = `
-                <p class="videoName">No video detected</p>
-                <p class="videoLink">Navigate to a video page to start syncing</p>
-            `;
         }
-    }
-    
-    syncVideo() {
-        if (!this.currentVideo) {
-            this.updateStatus('No video to sync');
-            return;
-        }
-        
-        this.updateStatus('Syncing video...');
-        
-       
-        setTimeout(() => {
-            this.updateStatus(`Synced with ${this.peers.size} peers`);
-            this.broadcastSync();
-        }, 1000);
-    }
-    
-    broadcastSync() {
-       
-        this.peers.forEach(peer => {
-            console.log(`Sending sync data to ${peer.id}`);
-        });
-    }
-    
-    leaveRoom() {
-        this.peers.clear();
-        this.roomId = null;
-        this.isHost = false;
-        this.currentVideo = null;
-        
-        this.showSetupSection();
-        this.updateStatus('Ready to connect');
-        this.updatePeerCount();
     }
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
-    const syncStream = new SyncStream();
+let classstate = null
+let connectionstate = false
+
+setTimeout(() => {
+    if (connectionstate) {
+        
+        
+    }
+}, 1000);
+
+document.getElementById('leaveBtn').addEventListener('click', () => {
+    try{
+        // this.dc.close()
+        // this.lc.close()
+    } catch (error) {
+        console.error("Error closing connections:", error)
+    }
+    document.getElementById('setupSection').style.display = 'block'
+    document.getElementById('roomSection').style.display = 'none'
+    classstate = null
+})
+
+document.getElementById('joinRoomBtn').addEventListener('click', () => {
+    if (connectionstate && classstate) {
+        document.getElementById('setupSection').style.display = 'none'
+        document.getElementById('roomSection').style.display = 'block'
+        // classstate = new syncreceiver()
+        // console.log(classstate)
+    } else {
+        alert("Please connect to a room first")
+    }
 });
 
+document.getElementById('createRoomBtn').addEventListener('click', () => {
+    console.log("clicked")
+    document.getElementById('setupSection').style.display = 'none'
+    document.getElementById('roomSection').style.display = 'block'
+    // classstate = new syncsender()
+    // console.log(classstate)
+})
+
+chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    if (tabs && tabs.length > 0) {
+    let currentTab = tabs[0];
+    let pageTitle = currentTab.title;
+    let pageLink = currentTab.url;
+    console.log("Page Title1:", pageTitle);
+    console.log("Page Link1:", pageLink);
+    // i <3 stackoverflow
+   }
+});
